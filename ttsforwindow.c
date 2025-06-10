@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,22 +6,22 @@
 
 // 플랫폼별 헤더 파일 포함
 #ifdef _WIN32
-    #include <windows.h>
-    #include <conio.h>
-    #include <process.h>
-    #define SLEEP(x) Sleep(x)
-    #define CLEAR_SCREEN() system("cls")
-    #define FLUSH_INPUT() while(kbhit()) getch()
+#include <windows.h>
+#include <conio.h>
+#include <process.h>
+#define SLEEP(x) Sleep(x)
+#define CLEAR_SCREEN() system("cls")
+#define FLUSH_INPUT() while(_kbhit()) _getch()
 #else
-    #include <unistd.h>
-    #include <termios.h>
-    #include <sys/select.h>
-    #include <sys/time.h>
-    #include <sys/ioctl.h>
-    #include <fcntl.h>
-    #define SLEEP(x) usleep((x)*1000)
-    #define CLEAR_SCREEN() system("clear")
-    #define FLUSH_INPUT() tcflush(STDIN_FILENO, TCIFLUSH)
+#include <unistd.h>
+#include <termios.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#define SLEEP(x) usleep((x)*1000)
+#define CLEAR_SCREEN() system("clear")
+#define FLUSH_INPUT() tcflush(STDIN_FILENO, TCIFLUSH)
 #endif
 
 /* 타이머  */
@@ -162,7 +163,7 @@ int terminal_initialized = 0;
 /* 시간 관련 함수 */
 long get_time_ms() {
 #ifdef _WIN32
-    return GetTickCount();
+    return (long)GetTickCount64();
 #else
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -196,19 +197,19 @@ void restore_console() {
 /* 키 입력 받기 */
 char get_key() {
 #ifdef _WIN32
-    if (kbhit()) {
-        return getch();
+    if (_kbhit()) {
+        return _getch();
     }
     return 0;
 #else
     fd_set read_fds;
     struct timeval timeout;
-    
+
     FD_ZERO(&read_fds);
     FD_SET(STDIN_FILENO, &read_fds);
     timeout.tv_sec = 0;
     timeout.tv_usec = 0;
-    
+
     if (select(STDIN_FILENO + 1, &read_fds, NULL, NULL, &timeout) > 0) {
         return getchar();
     }
@@ -219,7 +220,7 @@ char get_key() {
 /* 메뉴 표시 */
 int display_menu(void) {
     int menu = 0;
-    
+
     while (1) {
         CLEAR_SCREEN();
         printf("\n\n\t\t\t\tText Tetris");
@@ -232,15 +233,16 @@ int display_menu(void) {
         printf("\n\t\t\t   4) QUIT");
         printf("\n\t\t\t============================");
         printf("\n\t\t\t\t\t SELECT : ");
-        
+
         if (scanf("%d", &menu) != 1) {
             while (getchar() != '\n'); // 입력 버퍼 비우기
             continue;
         }
-        
+
         if (menu < 1 || menu > 4) {
             continue;
-        } else {
+        }
+        else {
             return menu;
         }
     }
@@ -284,7 +286,7 @@ int preview() {
 }
 
 /* 블록 배열 반환 */
-char (*get_block_array(int n))[4][4] {
+char (*get_block_array(int n))[4][4]{
     switch (n) {
         case I_BLOCK: return i_block;
         case T_BLOCK: return t_block;
@@ -365,7 +367,8 @@ void display_game() {
         for (int j = 0; j < 4; j++) {
             if (next_block[0][i][j]) {
                 printf("##");
-            } else {
+            }
+            else {
                 printf("  ");
             }
         }
@@ -383,13 +386,13 @@ void search_result() {
     printf("Enter name to search: ");
     if (fgets(name, sizeof(name), stdin) != NULL) {
         name[strcspn(name, "\n")] = '\0'; // 개행문자 제거
-        
+
         for (int i = 0; i < result_count; i++) {
             if (strcmp(result_list[i].name, name) == 0) {
-                printf("%s's record: %ld points - %d-%d-%d %d:%d\n", 
-                       name, result_list[i].point, result_list[i].year, 
-                       result_list[i].month, result_list[i].day, 
-                       result_list[i].hour, result_list[i].min);
+                printf("%s's record: %ld points - %d-%d-%d %d:%d\n",
+                    name, result_list[i].point, result_list[i].year,
+                    result_list[i].month, result_list[i].day,
+                    result_list[i].hour, result_list[i].min);
                 found = 1;
             }
         }
@@ -398,7 +401,7 @@ void search_result() {
         }
     }
     printf("\nPress any key to return to menu.\n");
-    getchar();
+    (void)getchar();
 }
 
 /* 기록 출력 */
@@ -406,67 +409,68 @@ void print_result() {
     printf("\n===== Score Records =====\n");
 
     for (int i = 0; i < result_count; i++) {
-        printf("%d. %s -> %ld points - %d-%d-%d %d:%d\n", 
-               i + 1, result_list[i].name, result_list[i].point, 
-               result_list[i].year, result_list[i].month, result_list[i].day, 
-               result_list[i].hour, result_list[i].min);
+        printf("%d. %s -> %ld points - %d-%d-%d %d:%d\n",
+            i + 1, result_list[i].name, result_list[i].point,
+            result_list[i].year, result_list[i].month, result_list[i].day,
+            result_list[i].hour, result_list[i].min);
     }
     printf("\nPress any key to return to menu.\n");
-    getchar();
-    getchar();
+    (void)getchar();
+    (void)getchar();
 }
 
 /* 키 입력 처리 */
 void handle_key(char key) {
     switch (key) {
-        case 'j': // 왼쪽 이동
-            if (is_move(-1, 0)) x--;
-            break;
-        case 'l': // 오른쪽 이동
-            if (is_move(1, 0)) x++;
-            break;
-        case 'k': // 아래로 이동
-            if (is_move(0, 1)) {
-                y++;
-            } else {
-                fix_block();
-                delete_blocks();
-                generate_block();
-            }
-            break;
-        case 'i': { // 회전
-            int next_state = (block_state + 1) % 4;
-            char (*block)[4][4] = get_block_array(block_number);
-            int rotate = 1;
-
-            for (int i = 0; i < 4 && rotate; i++) {
-                for (int j = 0; j < 4; j++) {
-                    if (block[next_state][i][j]) {
-                        int ny = y + i;
-                        int nx = x + j;
-                        if (ny >= 20 || nx < 1 || nx >= 9 || tetris_table[ny][nx]) {
-                            rotate = 0;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (rotate) block_state = (block_state + 1) % 4;
-            break;
+    case 'j': // 왼쪽 이동
+        if (is_move(-1, 0)) x--;
+        break;
+    case 'l': // 오른쪽 이동
+        if (is_move(1, 0)) x++;
+        break;
+    case 'k': // 아래로 이동
+        if (is_move(0, 1)) {
+            y++;
         }
-        case 'a': // 떨어지기
-            while (is_move(0, 1)) {
-                y++;
-            }
+        else {
             fix_block();
             delete_blocks();
             generate_block();
-            break;
-        case 'p': // 종료
-            game = GAME_END;
-            break;
-        default:
-            break;
+        }
+        break;
+    case 'i': { // 회전
+        int next_state = (block_state + 1) % 4;
+        char (*block)[4][4] = get_block_array(block_number);
+        int rotate = 1;
+
+        for (int i = 0; i < 4 && rotate; i++) {
+            for (int j = 0; j < 4; j++) {
+                if (block[next_state][i][j]) {
+                    int ny = y + i;
+                    int nx = x + j;
+                    if (ny >= 20 || nx < 1 || nx >= 9 || tetris_table[ny][nx]) {
+                        rotate = 0;
+                        break;
+                    }
+                }
+            }
+        }
+        if (rotate) block_state = (block_state + 1) % 4;
+        break;
+    }
+    case 'a': // 떨어지기
+        while (is_move(0, 1)) {
+            y++;
+        }
+        fix_block();
+        delete_blocks();
+        generate_block();
+        break;
+    case 'p': // 종료
+        game = GAME_END;
+        break;
+    default:
+        break;
     }
 }
 
@@ -506,7 +510,7 @@ void delete_blocks() {
         if (full) {
             for (int k = i; k > 0; k--) {
                 for (int j = 1; j <= 8; j++) {
-                    tetris_table[k][j] = tetris_table[k-1][j];
+                    tetris_table[k][j] = tetris_table[k - 1][j];
                 }
             }
 
@@ -563,7 +567,7 @@ void save_score() {
     }
 
     time_t now = time(NULL);
-    struct tm *t = localtime(&now);
+    struct tm* t = localtime(&now);
 
     result_list[result_count].point = point;
     result_list[result_count].year = t->tm_year + 1900;
@@ -585,7 +589,7 @@ void save_score() {
             }
         }
     }
-    
+
     // 랭킹 설정
     for (int i = 0; i < result_count; i++) {
         result_list[i].rank = i + 1;
@@ -596,7 +600,7 @@ void save_score() {
 int game_start() {
     reset_game();
     init_console();
-    
+
     char key;
     long last_drop = get_time_ms();
 
@@ -610,7 +614,8 @@ int game_start() {
         if (elapsed > 600) {
             if (is_move(0, 1)) {
                 y++;
-            } else {
+            }
+            else {
                 fix_block();
                 delete_blocks();
                 generate_block();
@@ -634,7 +639,7 @@ int game_start() {
         display_game();
         SLEEP(60); // 60ms 대기로 깜빡임 방지
     }
-    
+
     restore_console();
     save_score();
     return 1;
@@ -656,11 +661,14 @@ int main(void) {
         if (menu == 1) {
             game = GAME_START;
             menu = game_start();
-        } else if (menu == 2) {
+        }
+        else if (menu == 2) {
             search_result();
-        } else if (menu == 3) {
+        }
+        else if (menu == 3) {
             print_result();
-        } else if (menu == 4) {
+        }
+        else if (menu == 4) {
             exit(0);
         }
     }
