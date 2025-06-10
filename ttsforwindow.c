@@ -1,19 +1,20 @@
+#ifdef _WIN32
+    #include <conio.h>
+    #include <windows.h>
+    #include <io.h>
+#else
+    #include <sys/time.h>
+    #include <termios.h>
+    #include <unistd.h>
+    #include <sys/ioctl.h>
+    #include <sys/types.h>
+    #include <signal.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <string.h>
-#include <sys/time.h>
-#include <termios.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
 #include <time.h>
-#ifdef _WIN32
-#include <conio.h>
-#include <windows.h>
-#else
-#include <sys/select.h>
-#endif
 
 #define CCHAR 0
 #ifdef CTIME
