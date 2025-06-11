@@ -305,16 +305,16 @@ void display_game() {
     printf("Controls: j(left) l(right) k(down) i(rotate) a(drop) p(quit)\n\n");
 
     // 상단 테두리
-    printf("+");
-    for (int i = 0; i < 16; i++) printf("-");
-    printf("+\n");
+    printf("🔳");
+    for (int i = 0; i < 8; i++) printf("🔳");
+    printf("🔳\n");
 
     int preview_y = preview();
     char (*block)[4][4] = get_block_array(block_number);
 
     // 맵 출력 (0~18행, x=1~8열)
     for (int y_pos = 0; y_pos < 19; y_pos++) {
-        printf("|"); // 왼쪽 벽
+        printf("🔳"); // 왼쪽 벽
 
         for (int x_pos = 1; x_pos <= 8; x_pos++) {
             int is_block = 0;
@@ -342,22 +342,22 @@ void display_game() {
             }
 
             if (is_block)
-                printf("##");  // 현재 블럭
+                printf("🟨");  // 현재 블럭
             else if (is_preview)
-                printf("..");  // 미리보기
+                printf("⬜️");  // 미리보기
             else if (tetris_table[y_pos][x_pos])
-                printf("[]");  // 고정된 블럭
+                printf("🟥");  // 고정된 블럭
             else
                 printf("  ");  // 빈 공간
         }
 
-        printf("|\n"); // 오른쪽 벽
+        printf("🔳\n"); // 오른쪽 벽
     }
 
     // 하단 테두리
-    printf("+");
-    for (int i = 0; i < 16; i++) printf("-");
-    printf("+\n");
+    printf("🔳");
+    for (int i = 0; i < 8; i++) printf("🔳");
+    printf("🔳\n");
 
     // 다음 블럭 출력
     printf("\nNext Block:\n");
@@ -366,7 +366,7 @@ void display_game() {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if (next_block[0][i][j]) {
-                printf("##");
+                printf("🟨");
             }
             else {
                 printf("  ");
