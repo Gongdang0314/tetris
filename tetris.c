@@ -163,6 +163,8 @@ void init_console();
 void restore_console();
 long get_time_ms();
 int map_key(char key);
+void move_cursor_top();
+void hide_cursor();
 
 #ifndef _WIN32
 struct termios orig_termios; // 원래 터미널 설정 저장
@@ -203,24 +205,20 @@ void restore_console() {
 #endif
 }
 
-/* 커서 이동 ( 윈도우 용 )*/
+/* 커서 이동 */
 void move_cursor_top() {
-#ifdef _WIN32
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
     COORD coord = { 0, 0 };
     SetConsoleCursorPosition(h, coord);
-#endif
 }
 
-/* 커서 숨기기 (윈도우 용) */
+/* 커서 숨기기 */
 void hide_cursor() {
-#ifdef _WIN32
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO ci;
     ci.dwSize = 1;
     ci.bVisible = FALSE;
     SetConsoleCursorInfo(h, &ci);
-#endif
 }
 
 /* 키 입력 받기 */
@@ -655,6 +653,23 @@ void save_score() {
         result_list[i].rank = i + 1;
     }
 }
+void clear_screen_win32() {
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    DWORD count;
+    DWORD cellCount;
+    COORD homeCoords = {0, 0};
+
+    if (hConsole == INVALID_HANDLE_VALUE) return;
+
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return;
+    cellCount = csbi.dwSize.X * csbi.dwSize.Y;
+
+    FillConsoleOutputCharacter(hConsole, ' ', cellCount, homeCoords, &count);
+    FillConsoleOutputAttribute(hConsole, csbi.wAttributes, cellCount, homeCoords, &count);
+    SetConsoleCursorPosition(hConsole, homeCoords);
+}
+
 
 /* 게임 시작 */
 int game_start() {
@@ -670,7 +685,7 @@ int game_start() {
 
     while (game == GAME_START) {
         #ifdef _WIN32
-            move_cursor_top();
+            clear_screen_win32();
         #else
             CLEAR_SCREEN();
         #endif
