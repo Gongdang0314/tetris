@@ -24,18 +24,22 @@
 #define FLUSH_INPUT() tcflush(STDIN_FILENO, TCIFLUSH)
 #endif
 
-/* 타이머  */
+/* 타이머 -> 미사용 */
+/*
 #define CCHAR 0
 #ifdef CTIME
 #undef CTIME
 #endif
 #define CTIME 1
+*/
 
-/* 왼쪽, 오른쪽, 아래, 회전  */
+/* 왼쪽, 오른쪽, 아래, 회전, 드롭, 종료  */
 #define LEFT 0
 #define RIGHT 1
 #define DOWN 2
 #define ROTATE 3
+#define DROP 4
+#define QUIT 5
 
 /* 블록 모양 */
 #define I_BLOCK 0
@@ -141,7 +145,7 @@ void print_result();
 void reset_game();
 char get_key();
 void display_game();
-char (*get_block_array(int n))[4][4];
+char (*block_pattern(int n))[4][4];
 void handle_key(char key);
 int check_reach();
 void fix_block();
@@ -154,13 +158,14 @@ int preview();
 void init_console();
 void restore_console();
 long get_time_ms();
+int map_key(char key);
 
 #ifndef _WIN32
 struct termios orig_termios;
 int terminal_initialized = 0;
 #endif
 
-/* 시간 관련 함수 */
+/* 시간 함수 */
 long get_time_ms() {
 #ifdef _WIN32
     return (long)GetTickCount64();
@@ -184,7 +189,7 @@ void init_console() {
 #endif
 }
 
-/* 콘솔 복원 */
+/* 콘솔 되돌리기 */
 void restore_console() {
 #ifndef _WIN32
     if (terminal_initialized) {
@@ -250,15 +255,15 @@ int display_menu(void) {
 }
 
 /* 움직임 가능 여부 체크 */
-int is_move(int dx, int dy) {
-    char (*block)[4][4] = get_block_array(block_number);
+int is_move(int move_x, int move_y) {
+    char (*block)[4][4] = block_pattern(block_number);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if (block[block_state][i][j]) {
-                int ny = y + i + dy;
-                int nx = x + j + dx;
-                if (ny >= 19 || nx < 1 || nx >= 9) return 0;
-                if (tetris_table[ny][nx]) return 0;
+                int new_y = y + i + move_y;
+                int new_x = x + j + move_x;
+                if (new_y >= 19 || new_x < 1 || new_x >= 9) return 0;
+                if (tetris_table[new_y][new_x]) return 0;
             }
         }
     }
@@ -286,7 +291,7 @@ int preview() {
 }
 
 /* 블록 배열 반환 */
-char (*get_block_array(int n))[4][4]{
+char (*block_pattern(int n))[4][4]{
     switch (n) {
         case I_BLOCK: return i_block;
         case T_BLOCK: return t_block;
@@ -302,19 +307,31 @@ char (*get_block_array(int n))[4][4]{
 /* 게임 화면 출력 */
 void display_game() {
     printf("Score: %ld\n\n", point);
-    printf("Controls: j(left) l(right) k(down) i(rotate) a(drop) p(quit)\n\n");
+
+#ifdef _WIN32
+    const char* WALL = "█";
+    const char* BLOCK = "■";
+    const char* PREVIEW = "□";
+    const char* FIXED = "▣";
+    const char* EMPTY = "  ";
+#else
+    const char* WALL = "🔳";
+    const char* BLOCK = "🟨";
+    const char* PREVIEW = "⬜️";
+    const char* FIXED = "🟥";
+    const char* EMPTY = "  ";
+#endif
 
     // 상단 테두리
-    printf("🔳");
-    for (int i = 0; i < 8; i++) printf("🔳");
-    printf("🔳\n");
+    for (int i = 0; i < 10; i++) printf("%s", WALL);
+    printf("\n");
 
     int preview_y = preview();
-    char (*block)[4][4] = get_block_array(block_number);
+    char (*block)[4][4] = block_pattern(block_number);
 
     // 맵 출력 (0~18행, x=1~8열)
     for (int y_pos = 0; y_pos < 19; y_pos++) {
-        printf("🔳"); // 왼쪽 벽
+        printf("%s", WALL); // 왼쪽 벽
 
         for (int x_pos = 1; x_pos <= 8; x_pos++) {
             int is_block = 0;
@@ -323,7 +340,9 @@ void display_game() {
             // 블럭 미리보기
             for (int i = 0; i < 4 && !is_preview; i++) {
                 for (int j = 0; j < 4; j++) {
-                    if (block[block_state][i][j] && preview_y + i == y_pos && x + j == x_pos) {
+                    if (block[block_state][i][j] &&
+                        preview_y + i == y_pos &&
+                        x + j == x_pos) {
                         is_preview = 1;
                     }
                 }
@@ -333,7 +352,6 @@ void display_game() {
             for (int i = 0; i < 4; i++) {
                 for (int j = 0; j < 4; j++) {
                     if (y + i == y_pos && x + j == x_pos) {
-                        char (*block)[4][4] = get_block_array(block_number);
                         if (block[block_state][i][j]) {
                             is_block = 1;
                         }
@@ -342,39 +360,38 @@ void display_game() {
             }
 
             if (is_block)
-                printf("🟨");  // 현재 블럭
+                printf("%s", BLOCK);      // 현재 블럭
             else if (is_preview)
-                printf("⬜️");  // 미리보기
+                printf("%s", PREVIEW);    // 미리보기
             else if (tetris_table[y_pos][x_pos])
-                printf("🟥");  // 고정된 블럭
+                printf("%s", FIXED);      // 고정된 블럭
             else
-                printf("  ");  // 빈 공간
+                printf("%s", EMPTY);      // 빈 공간
         }
 
-        printf("🔳\n"); // 오른쪽 벽
+        printf("%s\n", WALL); // 오른쪽 벽
     }
 
     // 하단 테두리
-    printf("🔳");
-    for (int i = 0; i < 8; i++) printf("🔳");
-    printf("🔳\n");
+    for (int i = 0; i < 10; i++) printf("%s", WALL);
+    printf("\n");
 
     // 다음 블럭 출력
     printf("\nNext Block:\n");
-    char(*next_block)[4][4] = get_block_array(next_block_number);
+    char(*next_block)[4][4] = block_pattern(next_block_number);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if (next_block[0][i][j]) {
-                printf("🟨");
-            }
-            else {
-                printf("  ");
+                printf("%s", BLOCK);
+            } else {
+                printf("%s", EMPTY);
             }
         }
         printf("\n");
     }
 }
+
 
 /* 기록 검색 */
 void search_result() {
@@ -389,7 +406,7 @@ void search_result() {
 
         for (int i = 0; i < result_count; i++) {
             if (strcmp(result_list[i].name, name) == 0) {
-                printf("%s's record: %ld points - %d-%d-%d %d:%d\n",
+                printf("%s's record: %ld point - %d-%d-%d %d:%d\n",
                     name, result_list[i].point, result_list[i].year,
                     result_list[i].month, result_list[i].day,
                     result_list[i].hour, result_list[i].min);
@@ -406,7 +423,7 @@ void search_result() {
 
 /* 기록 출력 */
 void print_result() {
-    printf("\n===== Score Records =====\n");
+    printf("\n===== Ranked Scoreboard =====\n");
 
     for (int i = 0; i < result_count; i++) {
         printf("%d. %s -> %ld points - %d-%d-%d %d:%d\n",
@@ -419,58 +436,70 @@ void print_result() {
     (void)getchar();
 }
 
-/* 키 입력 처리 */
-void handle_key(char key) {
+/* 키 맵핑 */
+int map_key(char key) {
     switch (key) {
-    case 'j': // 왼쪽 이동
-        if (is_move(-1, 0)) x--;
-        break;
-    case 'l': // 오른쪽 이동
-        if (is_move(1, 0)) x++;
-        break;
-    case 'k': // 아래로 이동
-        if (is_move(0, 1)) {
-            y++;
-        }
-        else {
-            fix_block();
-            delete_blocks();
-            generate_block();
-        }
-        break;
-    case 'i': { // 회전
-        int next_state = (block_state + 1) % 4;
-        char (*block)[4][4] = get_block_array(block_number);
-        int rotate = 1;
+        case 'j': return LEFT;
+        case 'l': return RIGHT;
+        case 'k': return DOWN;
+        case 'i': return ROTATE;
+        case 'a': return DROP;
+        case 'p': return QUIT;
+        default: return -1;
+    }
+}
 
-        for (int i = 0; i < 4 && rotate; i++) {
-            for (int j = 0; j < 4; j++) {
-                if (block[next_state][i][j]) {
-                    int ny = y + i;
-                    int nx = x + j;
-                    if (ny >= 20 || nx < 1 || nx >= 9 || tetris_table[ny][nx]) {
-                        rotate = 0;
-                        break;
+/* 입력 받은 키 다루기 */
+void handle_key(char key) {
+    int dir = map_key(key);
+    switch (dir) {
+        case LEFT:
+            if (is_move(-1, 0)) x--;
+            break;
+        case RIGHT:
+            if (is_move(1, 0)) x++;
+            break;
+        case DOWN:
+            if (is_move(0, 1)) {
+                y++;
+            } else {
+                fix_block();
+                delete_blocks();
+                generate_block();
+            }
+            break;
+        case ROTATE: {
+            int next_state = (block_state + 1) % 4;
+            char (*block)[4][4] = block_pattern(block_number);
+            int can_rotate = 1;
+            for (int i = 0; i < 4 && can_rotate; i++) {
+                for (int j = 0; j < 4; j++) {
+                    if (block[next_state][i][j]) {
+                        int new_y = y + i;
+                        int new_x = x + j;
+                        if (new_y >= 20 || new_x < 1 || new_x >= 9 || tetris_table[new_y][new_x]) {
+                            can_rotate = 0;
+                            break;
+                        }
                     }
                 }
             }
+            if (can_rotate) block_state = next_state;
+            break;
         }
-        if (rotate) block_state = (block_state + 1) % 4;
-        break;
-    }
-    case 'a': // 떨어지기
-        while (is_move(0, 1)) {
-            y++;
-        }
-        fix_block();
-        delete_blocks();
-        generate_block();
-        break;
-    case 'p': // 종료
-        game = GAME_END;
-        break;
-    default:
-        break;
+        case DROP:
+            while(is_move(0, 1)){
+                y++;
+            }
+            fix_block();
+            delete_blocks();
+            generate_block();
+            break;
+        case QUIT:
+            game = GAME_END;
+            break;
+        default:
+            break;
     }
 }
 
@@ -481,16 +510,16 @@ int check_reach() {
 
 /* 블록 고정 */
 void fix_block() {
-    char (*block)[4][4] = get_block_array(block_number);
+    char (*block)[4][4] = block_pattern(block_number);
 
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if (block[block_state][i][j]) {
-                int ny = y + i;
-                int nx = x + j;
+                int new_y = y + i;
+                int new_x = x + j;
 
-                if (ny >= 0 && ny < 20 && nx >= 0 && nx < 10) {
-                    tetris_table[ny][nx] = 1;
+                if (new_y >= 0 && new_y < 20 && new_x >= 0 && new_x < 10) {
+                    tetris_table[new_y][new_x] = 1;
                 }
             }
         }
@@ -539,13 +568,13 @@ void generate_block() {
 
 /* 게임 오버 체크 */
 int game_over() {
-    char (*block)[4][4] = get_block_array(block_number);
+    char (*block)[4][4] = block_pattern(block_number);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if (block[block_state][i][j]) {
-                int ny = y + i;
-                int nx = x + j;
-                if (tetris_table[ny][nx]) {
+                int new_y = y + i;
+                int new_x = x + j;
+                if (tetris_table[new_y][new_x]) {
                     return 1;
                 }
             }
@@ -610,7 +639,7 @@ int game_start() {
         long current_time = get_time_ms();
         long elapsed = current_time - last_drop;
 
-        // 600ms마다 블록 자동 하강
+        // 블록 자동 하강
         if (elapsed > 600) {
             if (is_move(0, 1)) {
                 y++;
@@ -637,7 +666,7 @@ int game_start() {
         }
 
         display_game();
-        SLEEP(60); // 60ms 대기로 깜빡임 방지
+        SLEEP(60); // 깜빡임 방지
     }
 
     restore_console();
