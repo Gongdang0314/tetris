@@ -9,8 +9,8 @@
 #include <windows.h>
 #include <conio.h>
 #include <process.h>
-#define SLEEP(x) Sleep(x)
-#define CLEAR_SCREEN() system("cls")
+#define SLEEP(x) Sleep(x)  // 윈도우 대기 함수
+#define CLEAR_SCREEN() system("cls") // 윈도우 화면 클리어
 #define FLUSH_INPUT() while(_kbhit()) _getch()
 #else
 #include <unistd.h>
@@ -19,10 +19,14 @@
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#define SLEEP(x) usleep((x)*1000)
-#define CLEAR_SCREEN() system("clear")
+#define SLEEP(x) usleep((x)*1000) // 리눅스/맥 대기 함수
+#define CLEAR_SCREEN() system("clear")  // 리눅스/맥 화면 클리어
 #define FLUSH_INPUT() tcflush(STDIN_FILENO, TCIFLUSH)
 #endif
+
+/*
+윈도우로 실행하실 때는 mingw32-make후 mingw32-make run 하시면 됩니다!!!
+*/
 
 /* 타이머 -> 미사용 */
 /*
@@ -161,14 +165,14 @@ long get_time_ms();
 int map_key(char key);
 
 #ifndef _WIN32
-struct termios orig_termios;
-int terminal_initialized = 0;
+struct termios orig_termios; // 원래 터미널 설정 저장
+int terminal_initialized = 0;  // 터미널 초기화 여부
 #endif
 
-/* 시간 함수 */
+/* 시간 반환 함수 */
 long get_time_ms() {
 #ifdef _WIN32
-    return (long)GetTickCount64();
+    return (long)GetTickCount();
 #else
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -180,7 +184,7 @@ long get_time_ms() {
 void init_console() {
 #ifndef _WIN32
     if (!terminal_initialized) {
-        tcgetattr(STDIN_FILENO, &orig_termios);
+        tcgetattr(STDIN_FILENO, &orig_termios); // 현재 터미널 설정 저장
         struct termios new_termios = orig_termios;
         new_termios.c_lflag &= ~(ICANON | ECHO);
         tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
@@ -199,10 +203,26 @@ void restore_console() {
 #endif
 }
 
+/* 커서 이동 ( 윈도우 용 )*/
+void move_cursor_top() {
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    COORD coord = { 0, 0 };
+    SetConsoleCursorPosition(h, coord);
+}
+
+/* 커서 숨기기 (윈도우 용) */
+void hide_cursor() {
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    CONSOLE_CURSOR_INFO ci;
+    ci.dwSize = 1;
+    ci.bVisible = FALSE;
+    SetConsoleCursorInfo(h, &ci);
+}
+
 /* 키 입력 받기 */
 char get_key() {
 #ifdef _WIN32
-    if (_kbhit()) {
+    if (_kbhit()) {  // 키 눌렸는지 확인하고 반환값 지정
         return _getch();
     }
     return 0;
@@ -260,8 +280,9 @@ int is_move(int move_x, int move_y) {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             if (block[block_state][i][j]) {
-                int new_y = y + i + move_y;
-                int new_x = x + j + move_x;
+                int new_y = y + i + move_y;  // 새로운 Y좌표
+                int new_x = x + j + move_x;  // 새로운 X좌표
+                // 경계를 벗어나거나 이미 블록이 있는 위치인지 확인인
                 if (new_y >= 19 || new_x < 1 || new_x >= 9) return 0;
                 if (tetris_table[new_y][new_x]) return 0;
             }
@@ -272,13 +293,13 @@ int is_move(int move_x, int move_y) {
 
 /* 게임 초기화 */
 void reset_game() {
-    memset(tetris_table, 0, sizeof(tetris_table));
-    point = 0;
-    block_number = rand() % 7;
-    next_block_number = rand() % 7;
-    x = 3;
-    y = 0;
-    block_state = 0;
+    memset(tetris_table, 0, sizeof(tetris_table)); // 게임판 초기화
+    point = 0; // 점수 초기화
+    block_number = rand() % 7; // 현재 블록 랜덤 생성
+    next_block_number = rand() % 7; // 다음 블록 랜덤 생성
+    x = 3; // 블록 시작 x위치
+    y = 0; // 블록 시작 Y위치
+    block_state = 0; // 블록 회전 상태 초기화
 }
 
 /* 미리보기 위치 계산 */
@@ -306,13 +327,13 @@ char (*block_pattern(int n))[4][4]{
 
 /* 게임 화면 출력 */
 void display_game() {
-    printf("Score: %ld\n\n", point);
+    printf("Score: %ld\n\n", point); // 현재 점수 출력
 
 #ifdef _WIN32
-    const char* WALL = "█";
-    const char* BLOCK = "■";
-    const char* PREVIEW = "□";
-    const char* FIXED = "▣";
+    const char* WALL = "▣ ";
+    const char* BLOCK = "▩ ";
+    const char* PREVIEW = "▤ ";
+    const char* FIXED = "▩ ";
     const char* EMPTY = "  ";
 #else
     const char* WALL = "🔳";
@@ -322,22 +343,22 @@ void display_game() {
     const char* EMPTY = "  ";
 #endif
 
-    // 상단 테두리
+    // 상단 테두리 출력
     for (int i = 0; i < 10; i++) printf("%s", WALL);
     printf("\n");
 
     int preview_y = preview();
     char (*block)[4][4] = block_pattern(block_number);
 
-    // 맵 출력 (0~18행, x=1~8열)
+    // 맵 출력
     for (int y_pos = 0; y_pos < 19; y_pos++) {
-        printf("%s", WALL); // 왼쪽 벽
+        printf("%s", WALL); // 왼쪽 벽 출력
 
         for (int x_pos = 1; x_pos <= 8; x_pos++) {
-            int is_block = 0;
-            int is_preview = 0;
+            int is_block = 0; // 현재 블록 위치인지
+            int is_preview = 0; // 미리보기 위치인지
 
-            // 블럭 미리보기
+            // 블럭 미리보기 위치 확인
             for (int i = 0; i < 4 && !is_preview; i++) {
                 for (int j = 0; j < 4; j++) {
                     if (block[block_state][i][j] &&
@@ -369,10 +390,10 @@ void display_game() {
                 printf("%s", EMPTY);      // 빈 공간
         }
 
-        printf("%s\n", WALL); // 오른쪽 벽
+        printf("%s\n", WALL); // 오른쪽 벽 출력
     }
 
-    // 하단 테두리
+    // 하단 테두리 출력
     for (int i = 0; i < 10; i++) printf("%s", WALL);
     printf("\n");
 
@@ -404,6 +425,7 @@ void search_result() {
     if (fgets(name, sizeof(name), stdin) != NULL) {
         name[strcspn(name, "\n")] = '\0'; // 개행문자 제거
 
+        // 저장된 기록에서 이름으로 검색
         for (int i = 0; i < result_count; i++) {
             if (strcmp(result_list[i].name, name) == 0) {
                 printf("%s's record: %ld point - %d-%d-%d %d:%d\n",
@@ -472,6 +494,8 @@ void handle_key(char key) {
             int next_state = (block_state + 1) % 4;
             char (*block)[4][4] = block_pattern(block_number);
             int can_rotate = 1;
+
+            // 회전 가능한지 확인
             for (int i = 0; i < 4 && can_rotate; i++) {
                 for (int j = 0; j < 4; j++) {
                     if (block[next_state][i][j]) {
@@ -518,6 +542,7 @@ void fix_block() {
                 int new_y = y + i;
                 int new_x = x + j;
 
+                // 유효한 범위 내에서 블록 고정
                 if (new_y >= 0 && new_y < 20 && new_x >= 0 && new_x < 10) {
                     tetris_table[new_y][new_x] = 1;
                 }
@@ -529,7 +554,7 @@ void fix_block() {
 /* 블록 삭제 */
 void delete_blocks() {
     for (int i = 18; i >= 0; i--) {
-        int full = 1;
+        int full = 1;  // 해당 줄이 가득 찼는지 확인
         for (int j = 1; j <= 8; j++) {
             if (tetris_table[i][j] == 0) {
                 full = 0;
@@ -537,12 +562,13 @@ void delete_blocks() {
             }
         }
         if (full) {
+            // 한 줄 삭제 후 위의 줄들을 한 줄씩 아래로 복사사
             for (int k = i; k > 0; k--) {
                 for (int j = 1; j <= 8; j++) {
                     tetris_table[k][j] = tetris_table[k - 1][j];
                 }
             }
-
+            // 최상단 줄을 비우기
             for (int j = 1; j <= 8; j++) {
                 tetris_table[0][j] = 0;
             }
@@ -585,6 +611,7 @@ int game_over() {
 
 /* 점수 저장 */
 void save_score() {
+    CLEAR_SCREEN();
     if (result_count >= MAX_RESULT) {
         printf("Maximum capacity exceeded");
         return;
@@ -630,17 +657,25 @@ int game_start() {
     reset_game();
     init_console();
 
+    #ifdef _WIN32
+        hide_cursor();
+    #endif
+
     char key;
     long last_drop = get_time_ms();
 
     while (game == GAME_START) {
-        CLEAR_SCREEN();
+        #ifdef _WIN32
+            move_cursor_top();
+        #else
+            CLEAR_SCREEN();
+        #endif
 
         long current_time = get_time_ms();
         long elapsed = current_time - last_drop;
 
         // 블록 자동 하강
-        if (elapsed > 600) {
+        if (elapsed > 500) {
             if (is_move(0, 1)) {
                 y++;
             }
@@ -666,7 +701,7 @@ int game_start() {
         }
 
         display_game();
-        SLEEP(60); // 깜빡임 방지
+        SLEEP(30);
     }
 
     restore_console();
@@ -678,6 +713,8 @@ int game_start() {
 int main(void) {
 #ifdef _WIN32
     srand((unsigned int)(time(NULL) + _getpid()));
+    SetConsoleOutputCP(CP_UTF8); // 콘솔 문자 인코딩 설정
+    SetConsoleCP(CP_UTF8);
 #else
     srand((unsigned int)(time(NULL) + getpid()));
 #endif
@@ -689,12 +726,15 @@ int main(void) {
 
         if (menu == 1) {
             game = GAME_START;
+            CLEAR_SCREEN();
             menu = game_start();
         }
         else if (menu == 2) {
+            CLEAR_SCREEN();
             search_result();
         }
         else if (menu == 3) {
+            CLEAR_SCREEN();
             print_result();
         }
         else if (menu == 4) {
