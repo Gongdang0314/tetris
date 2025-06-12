@@ -119,7 +119,7 @@ char o_block[4][4][4] = {
 char tetris_table[21][10];
 
 /* 결과 저장 구조체 */
-static struct result {
+struct result {
     char name[30];
     long point;
     int year;
@@ -128,7 +128,7 @@ static struct result {
     int hour;
     int min;
     int rank;
-} temp_result;
+}; // temp_result;
 
 /* 전역 변수 */
 int block_number = 0;
@@ -205,18 +205,22 @@ void restore_console() {
 
 /* 커서 이동 ( 윈도우 용 )*/
 void move_cursor_top() {
+#ifdef _WIN32
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
     COORD coord = { 0, 0 };
     SetConsoleCursorPosition(h, coord);
+#endif
 }
 
 /* 커서 숨기기 (윈도우 용) */
 void hide_cursor() {
+#ifdef _WIN32
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO ci;
     ci.dwSize = 1;
     ci.bVisible = FALSE;
     SetConsoleCursorInfo(h, &ci);
+#endif
 }
 
 /* 키 입력 받기 */
