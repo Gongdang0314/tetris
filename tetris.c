@@ -9,8 +9,8 @@
 #include <windows.h>
 #include <conio.h>
 #include <process.h>
-#define SLEEP(x) Sleep(x)  // 윈도우 대기 함수
-#define CLEAR_SCREEN() system("cls") // 윈도우 화면 클리어
+#define SLEEP(x) Sleep(x)
+#define CLEAR_SCREEN() system("cls")
 #define FLUSH_INPUT() while(_kbhit()) _getch()
 #else
 #include <unistd.h>
@@ -19,8 +19,8 @@
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#define SLEEP(x) usleep((x)*1000) // 리눅스/맥 대기 함수
-#define CLEAR_SCREEN() system("clear")  // 리눅스/맥 화면 클리어
+#define SLEEP(x) usleep((x)*1000)
+#define CLEAR_SCREEN() system("clear")
 #define FLUSH_INPUT() tcflush(STDIN_FILENO, TCIFLUSH)
 #endif
 
@@ -206,13 +206,16 @@ void restore_console() {
 }
 
 /* 커서 이동 */
+#ifdef _WIN32
 void move_cursor_top() {
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
     COORD coord = { 0, 0 };
     SetConsoleCursorPosition(h, coord);
 }
+#endif
 
 /* 커서 숨기기 */
+#ifdef _WIN32
 void hide_cursor() {
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO ci;
@@ -220,6 +223,7 @@ void hide_cursor() {
     ci.bVisible = FALSE;
     SetConsoleCursorInfo(h, &ci);
 }
+#endif
 
 /* 키 입력 받기 */
 char get_key() {
@@ -653,22 +657,7 @@ void save_score() {
         result_list[i].rank = i + 1;
     }
 }
-void clear_screen_win32() {
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    DWORD count;
-    DWORD cellCount;
-    COORD homeCoords = {0, 0};
 
-    if (hConsole == INVALID_HANDLE_VALUE) return;
-
-    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) return;
-    cellCount = csbi.dwSize.X * csbi.dwSize.Y;
-
-    FillConsoleOutputCharacter(hConsole, ' ', cellCount, homeCoords, &count);
-    FillConsoleOutputAttribute(hConsole, csbi.wAttributes, cellCount, homeCoords, &count);
-    SetConsoleCursorPosition(hConsole, homeCoords);
-}
 
 
 /* 게임 시작 */
@@ -684,11 +673,7 @@ int game_start() {
     long last_drop = get_time_ms();
 
     while (game == GAME_START) {
-        #ifdef _WIN32
-            clear_screen_win32();
-        #else
-            CLEAR_SCREEN();
-        #endif
+        
 
         long current_time = get_time_ms();
         long elapsed = current_time - last_drop;
@@ -719,6 +704,11 @@ int game_start() {
             break;
         }
 
+        #ifdef _WIN32
+            move_cursor_top();
+        #else
+            CLEAR_SCREEN();
+        #endif
         display_game();
         SLEEP(30);
     }
